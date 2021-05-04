@@ -1,6 +1,6 @@
 terraform {
   required_providers {
-    aws ={}
+    aws = {}
   }
 }
 
@@ -48,17 +48,28 @@ resource "aws_security_group" "allow_http" {
   }
 }
 
-resource "aws_instance" "remote_web" {
-  ami = "ami-048f6ed62451373d9"
-  instance_type = "t2.micro"
+resource "aws_instance" "web_server" {
+  ami             = "ami-048f6ed62451373d9"
+  instance_type   = "t2.micro"
   security_groups = [aws_security_group.allow_ssh.name, aws_security_group.allow_http.name]
-  key_name = "minhachavepessoal"
+  key_name        = "minhachavepessoal"
 
+  provisioner "file" {
+    source      = "files/index.html"
+    destination = "/tmp/index.html"
+  }
+  connection {
+    type        = "ssh"
+    user        = "ec2-user"
+    private_key = file("~/.ssh/id_rsa")
+    host        = self.public_ip
+  }
   provisioner "remote-exec" {
       inline = [
         "sudo yum install httpd -y",
         "sudo systemctl enable httpd.service",
-        "sudo systemctl start httpd.service"
+        "sudo systemctl start httpd.service",
+        "sudo mv /tmp/index.html /var/www/html/index.html"
       ]
 
     connection {
@@ -67,12 +78,12 @@ resource "aws_instance" "remote_web" {
         private_key = file("~/.ssh/id_rsa")
         host = self.public_ip
     }
-  }
-  tags = {
-    "Name" = "Remote"
-  }
+}
+tags = {
+  "Name" = "Webserver"
+}
 }
 
 output "ip_publico_webserver" {
-  value = aws_instance.remote_web.public_ip
+  value = aws_instance.web_server.public_ip
 }
